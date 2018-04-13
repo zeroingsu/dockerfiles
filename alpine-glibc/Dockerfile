@@ -1,4 +1,4 @@
-FROM zeroing/alpine-base:3.7
+FROM zeroing/alpine:3.7-base
 
 ENV LANG=C.UTF-8
 
