@@ -1,4 +1,4 @@
-FROM zeroing/alpine-oraclejre:3.7_8u161-b12
+FROM zeroing/alpine-oraclejre8:3.7_8u161-b12
 
 MAINTAINER zeroing <admin@zeroing.io>
 
