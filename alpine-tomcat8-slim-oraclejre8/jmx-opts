@@ -1,0 +1,133 @@
+#!/bin/sh
+
+# Parse options
+while [ $# -gt 0 ]
+do
+key="$1"
+case ${key} in
+    # Escape for scripts which eval the output of this script
+    -e|--escape)
+    escape_sep=1
+    ;;
+esac
+shift
+done
+
+# Check whether a given config is contained in MNT_JOLOKIA_OPTS
+is_in_jolokia_opts() {
+  local prop=$1
+  if [ -n "${MNT_JOLOKIA_OPTS:-}" ] && [ "${MNT_JOLOKIA_OPTS}" != "${MNT_JOLOKIA_OPTS/${prop}/}" ]; then
+     echo "yes"
+  else
+     echo "no"
+  fi
+}
+
+dir=${MNT_DIR:-/opt/monitor}
+sep="="
+
+# Options separators defined to avoid clash
+mnt_open_del="{""{"
+mnt_close_del="}""}"
+if [ -n "${escape_sep:-}" ]; then
+  mnt_open_del='\{\{'
+  mnt_close_del='\}\}'
+fi
+
+if [ -z "${MNT_OFF:-}" ]; then
+   # JOLOKIA,default port 8778
+   opts="-javaagent:$dir/jolokia-jvm-agent.jar"
+   config="${MNT_CONFIG:-$dir/jolokia.properties}"
+   if [ -f "$config" ]; then
+      # Configuration takes precedence
+      opts="${opts}${sep}config=${config}"
+      sep=':'
+   fi
+   # JMX_EXPORTER
+   opts="${opts} -javaagent:$dir/jmx_prometheus_javaagent.jar=9779"
+   config="${MNT_CONFIG:-$dir/jmx_exporter_config.yml}"
+   if [ -f "$config" ]; then
+      # Configuration takes precedence
+      opts="${opts}${sep}${config}"
+      sep=","
+   fi
+
+   if [ -z "${MNT_ENMNTLED:-}" ] || [ "${MNT_ENMNTLED}" != "${MNT_ENMNTLED/jolokia/}" ]; then
+     # Direct options only if no configuration is found
+     jsep=""
+     jolokia_opts=""
+     if [ -n "${MNT_JOLOKIA_CONFIG:-}" ] && [ -f "${MNT_JOLOKIA_CONFIG}" ]; then
+        jolokia_opts="${jolokia_opts}${jsep}config=${MNT_JOLOKIA_CONFIG}"
+        jsep=","
+        grep -q -e '^host' ${MNT_JOLOKIA_CONFIG} && host_in_config=1
+     fi
+     if [ -z "${MNT_JOLOKIA_HOST:-}" ] && [ -z "${host_in_config:-}" ]; then
+        MNT_JOLOKIA_HOST='0.0.0.0'
+     fi
+     if [ -n "${MNT_JOLOKIA_HOST:-}" ]; then
+        jolokia_opts="${jolokia_opts}${jsep}host=${MNT_JOLOKIA_HOST}"
+        jsep=","
+     fi
+     if [ -n "${MNT_JOLOKIA_PORT:-}" ]; then
+        jolokia_opts="${jolokia_opts}${jsep}port=${MNT_JOLOKIA_PORT}"
+        jsep=","
+     fi
+     if [ -n "${MNT_JOLOKIA_USER:-}" ]; then
+        jolokia_opts="${jolokia_opts}${jsep}user=${MNT_JOLOKIA_USER}"
+        jsep=","
+     fi
+     if [ -n "${MNT_JOLOKIA_PASSWORD:-}" ]; then
+        jolokia_opts="${jolokia_opts}${jsep}password=${MNT_JOLOKIA_PASSWORD}"
+        jsep=","
+     fi
+     if [ -n "${MNT_JOLOKIA_HTTPS:-}" ]; then
+        jolokia_opts="${jolokia_opts}${jsep}protocol=https"
+        https_used=1
+        jsep=","
+     fi
+     # Integration with OpenShift client cert auth
+     if [ -n "${MNT_JOLOKIA_AUTH_OPENSHIFT:-}" ]; then
+        auth_opts="useSslClientAuthentication=true,extraClientCheck=true"
+        if [ -z "${https_used+x}" ]; then
+          auth_opts="${auth_opts},protocol=https"
+        fi
+        if [ $(is_in_jolokia_opts "caCert") != "yes" ]; then
+           auth_opts="${auth_opts},caCert=/var/run/secrets/kubernetes.io/serviceaccount/ca.crt"
+        fi
+        if [ $(is_in_jolokia_opts "clientPrincipal") != "yes" ]; then
+           if [  "${MNT_JOLOKIA_AUTH_OPENSHIFT}" != "${MNT_JOLOKIA_AUTH_OPENSHIFT/=/}" ]; then
+              # Supposed to contain a principal name to check
+              auth_opts="${auth_opts},clientPrincipal=$(echo ${MNT_JOLOKIA_AUTH_OPENSHIFT} | sed -e 's/ /\\\\ /g')"
+           else
+              auth_opts="${auth_opts},clientPrincipal=cn=system:master-proxy"
+           fi
+        fi
+        jolokia_opts="${jolokia_opts}${jsep}${auth_opts}"
+        jsep=","
+     fi
+     # Add extra opts to the end
+     if [ -n "${MNT_JOLOKIA_OPTS:-}" ]; then
+        jolokia_opts="${jolokia_opts}${jsep}${MNT_JOLOKIA_OPTS}"
+        jsep=","
+     fi
+
+     opts="${opts}${sep}jolokia${mnt_open_del}${jolokia_opts}${mnt_close_del}"
+     sep=","
+   fi
+   if [ -z "${MNT_ENMNTLED:-}" ] || [ "${MNT_ENMNTLED}" != "${MNT_ENMNTLED/jmx_exporter/}" ]; then
+     je_opts=""
+     jsep=""
+     if [ -n "${MNT_JMX_EXPORTER_OPTS:-}" ]; then
+        opts="${opts}${sep}jmx_exporter${mnt_open_del}${MNT_JMX_EXPORTER_OPTS}${mnt_close_del}"
+        sep=","
+     else
+        port=${MNT_JMX_EXPORTER_PORT:-9779}
+        config=${MNT_JMX_EXPORTER_CONFIG:-/opt/monitor/jmx_exporter_config.yml}
+        opts="${opts}${sep}jmx_exporter${mnt_open_del}${port}:${config}${mnt_close_del}"
+        sep=","
+     fi
+   fi
+   if [ "${sep:-}" != '=' ] ; then
+     echo ${opts}
+   fi
+fi
