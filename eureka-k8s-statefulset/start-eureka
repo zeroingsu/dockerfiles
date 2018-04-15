@@ -1,0 +1,285 @@
+#!/usr/bin/env bash
+
+#Usage: start-eureka [OPTIONS]
+
+# Starts a Eureka server based on the supplied options.
+#     --servers           The number of servers in the ensemble.default 1.
+
+#     --conf_file         The directoyr where the Eureka process will store its
+#                         configuration. The default is /opt/eureka/conf/application.properties.
+
+#     --server_port       The port on which the Eureka process will listen for
+#                         requests from other servers in the ensemble. The
+#                         default is 8080.
+
+#     --eureka_datacenter   Data center configuration.default cloud.
+
+#     --eureka_environment  Environmental information configuration.default test.
+
+#     --eureka_client_registerWithEureka
+#                         Set whether the registration information was obtained from the registry (default true).
+
+#     --eureka_client_fetchRegistry
+#                         Will set self as the client registration to the registration center (default true).
+
+#     --eureka_instance_preferIpAddress
+#                         Client use IP registration service.default false.with native deployment recommendations to 'true',with docker(include k8s) recommendations to 'false'.
+
+#     --eureka_instance_instance_id
+#                         Web UI show client registration infomation format.default show '${spring.cloud.client.hostname}:${server.port}'
+#                         with native deployment recommendations to '${spring.cloud.client.ipAddress}:${server.port}';
+#                         with docker(include k8s) recommendations to '${spring.cloud.client.hostname}:${server.port}'.
+
+#     --eureka_server_enable_self_preservation
+#                         Registry protection mechanism.default true.
+
+#     --eureka_server_responseCacheUpdateInvervalMs
+#                         Eureka server refresh readCacheMap time.default 30s.
+
+#     --eureka_server_responseCacheAutoExpirationInSeconds
+#                         Eureka readWriteCacheMap server cache expiration time.default 180s.
+
+#     --eureka_server_eviction_interval_timer_in_ms
+#                         Enable active failure, failure detection and each active interval is 3s.
+
+#     --eureka_instance_lease_expiration_duration_in_seconds
+#                         Service expiration time configuration, and more than this time did not receive the heartbeat EurekaServer will eliminate this instance.default 90s.
+
+#     --eureka_instance_lease_renewal_interval_in_seconds
+#                         Service configuration, the refresh time every this time will take the initiative to a heartbeat.default 30s.
+
+#     --eureka_client_registryFetchIntervalSeconds
+#                         Eureka client refresh local cache time.default 30s.
+
+#     --ribbon_ServerListRefreshInterval
+#                         Eureka client ribbon break time.default 30s.
+
+#     --heap              The maximum amount of heap to use. The format is the
+#                         same as that used for the Xmx and Xms parameters to the
+#                         JVM. e.g. --heap=1G. The default is 1G.
+
+
+USER=`whoami`
+HOST=`hostname -s`
+DOMAIN=`hostname -d`
+SERVERS=1
+HEAP="512G"
+CONF_FILE="/opt/eureka/conf/application.properties"
+SERVER_PORT="8761"
+Eureka_datacenter='cloud'
+Eureka_environment='test'
+Eureka_client_registerWithEureka="true"
+Eureka_client_fetchRegistry="true"
+Eureka_server_enable_self_preservation="true"
+Eureka_instance_preferIpAddress="false"
+#Eureka_instance_instance_id="\${spring.cloud.client.hostname}:\${server.port}"
+Eureka_server_responseCacheUpdateInvervalMs="3000"
+Eureka_server_responseCacheAutoExpirationInSeconds="180"
+Eureka_server_eviction_interval_timer_in_ms="3000"
+Eureka_instance_lease_expiration_duration_in_seconds="30"
+Eureka_instance_lease_renewal_interval_in_seconds="10"
+Eureka_client_registryFetchIntervalSeconds="5"
+Ribbon_ServerListRefreshInterval="5000"
+
+
+function print_usage() {
+echo "\
+Usage: start-eureka [OPTIONS]
+Starts a Eureka server based on the supplied options.
+     --servers           The number of servers in the ensemble.default 1.
+
+     --conf_file         The directoyr where the Eureka process will store its
+                         configuration. The default is /opt/eureka/conf/application.properties.
+     --server_port       The port on which the Eureka process will listen for
+                         requests from other servers in the ensemble. The default is 8761.
+
+     --eureka_datacenter   Data center configuration.default cloud.
+
+     --eureka_environment  Environmental information configuration.default test.
+
+     --eureka_client_registerWithEureka
+                         Set whether the registration information was obtained from the registry (default true).
+
+     --eureka_client_fetchRegistry
+                         Will set self as the client registration to the registration center (default true).
+
+     --eureka_instance_preferIpAddress
+                         Client use IP registration service.default false.with native deployment recommendations to 'true',with docker(include k8s) recommendations to 'false'.
+
+#     --eureka_instance_instance_id
+#                         Web UI show client registration infomation format.default show '${spring.cloud.client.hostname}:${server.port}'
+#                         with native deployment recommendations to '${spring.cloud.client.ipAddress}:${server.port}';
+#                         with docker(include k8s) recommendations to '${spring.cloud.client.hostname}:${server.port}'.
+
+     --eureka_server_enable_self_preservation
+                         Registry protection mechanism.default true.
+
+     --eureka_server_responseCacheUpdateInvervalMs
+                         Eureka server refresh readCacheMap time.default 30s.
+
+     --eureka_server_responseCacheAutoExpirationInSeconds
+                         Eureka readWriteCacheMap server cache expiration time.default 180s.
+
+     --eureka_server_eviction_interval_timer_in_ms
+                         Enable active failure, failure detection and each active interval is 3s.
+
+     --eureka_instance_lease_expiration_duration_in_seconds
+                         Service expiration time configuration, and more than this time did not receive the heartbeat EurekaServer will eliminate this instance.default 90s.
+
+     --eureka_instance_lease_renewal_interval_in_seconds
+                         Service configuration, the refresh time every this time will take the initiative to a heartbeat.default 30s.
+
+     --eureka_client_registryFetchIntervalSeconds
+                         Eureka client refresh local cache time.default 30s.
+
+     --ribbon_ServerListRefreshInterval
+                         Eureka client ribbon break time.default 30s.
+
+     --heap              The maximum amount of heap to use. The format is the
+                         same as that used for the Xmx and Xms parameters to the
+                         JVM. e.g. --heap=1G. The default is 1G.
+"
+}
+
+
+function print_servers() {
+    for (( i=1; i<=$SERVERS; i++ ))
+    do
+       if [ $i -gt 1 ]; then
+          sep=','
+       else
+          sep=''
+       fi
+    SERVICE_URL=${SERVICE_URL}${sep}"http://$NAME-$((i-1)).$DOMAIN:$SERVER_PORT/eureka"
+    done
+
+    SERVICE_URL="eureka.client.service-url.defaultZone=${SERVICE_URL}"
+    echo ${SERVICE_URL}
+}
+
+function create_config() {
+    rm -f $CONF_FILE
+    echo "#This file was autogenerated DO NOT EDIT" >> $CONF_FILE
+    echo "server.port=$SERVER_PORT" >> $CONF_FILE
+    echo "eureka.datacenter=$Eureka_datacenter" >> $CONF_FILE
+    echo "eureka.environment=$Eureka_environment" >> $CONF_FILE
+    echo "eureka.client.registerWithEureka=$Eureka_client_registerWithEureka" >> $CONF_FILE
+    echo "eureka.client.fetchRegistry=$Eureka_client_fetchRegistry" >> $CONF_FILE
+    echo "eureka.instance.preferIpAddress=$Eureka_instance_preferIpAddress" >> $CONF_FILE
+#    echo "eureka.instance.instance-id=$Eureka_instance_instance_id" >> $CONF_FILE
+    echo "eureka.server.enable-self-preservation=$Eureka_server_enable_self_preservation" >> $CONF_FILE
+    echo "eureka.server.responseCacheUpdateInvervalMs=$Eureka_server_responseCacheUpdateInvervalMs" >> $CONF_FILE
+    echo "eureka.server.responseCacheAutoExpirationInSeconds=$Eureka_server_responseCacheAutoExpirationInSeconds" >> $CONF_FILE
+    echo "eureka.server.eviction-interval-timer-in-ms=$Eureka_server_eviction_interval_timer_in_ms" >> $CONF_FILE
+    echo "eureka.instance.lease-expiration-duration-in-seconds=$Eureka_instance_lease_expiration_duration_in_seconds" >> $CONF_FILE
+    echo "eureka.instance.lease-renewal-interval-in-seconds=$Eureka_instance_lease_renewal_interval_in_seconds" >> $CONF_FILE
+    echo "eureka.client.registryFetchIntervalSeconds=$Eureka_client_registryFetchIntervalSeconds" >> $CONF_FILE
+    echo "ribbon.ServerListRefreshInterval=$Ribbon_ServerListRefreshInterval" >> $CONF_FILE
+
+    print_servers >> $CONF_FILE
+    cat $CONF_FILE >&2
+}
+
+
+
+function create_jvm_props() {
+    JVMFLAGS="-Xmx$HEAP -Xms$HEAP" 
+}
+
+
+optspec=":hv-:"
+while getopts "$optspec" optchar; do
+
+    case "${optchar}" in
+        -)
+            case "${OPTARG}" in
+                servers=*)
+                    SERVERS=${OPTARG##*=}
+                    ;;
+                conf_file=*)
+                    CONF_FILE=${OPTARG##*=}
+                    ;;
+                server_port=*)
+                    SERVER_PORT=${OPTARG##*=}
+                    ;;
+                eureka_datacenter=*)
+                    Eureka_datacenter=${OPTARG##*=}
+                    ;;
+                eureka_environment=*)
+                    Eureka_environment=${OPTARG##*=}
+                    ;;
+                eureka_client_registerWithEureka=*)
+                    Eureka_client_registerWithEureka=${OPTARG##*=}
+                    ;;
+                eureka_client_fetchRegistry=*)
+                    Eureka_client_fetchRegistry=${OPTARG##*=}
+                    ;;
+                eureka_instance_preferIpAddress=*)
+                    Eureka_instance_preferIpAddress=${OPTARG##*=}
+                    ;;
+#                eureka_instance_instance_id=*)
+#                    Eureka_instance_instance_id=${OPTARG##*=}
+#                    ;;
+                eureka_server_enable_self_preservation=*)
+                    Eureka_server_enable_self_preservation=${OPTARG##*=}
+                    ;;
+                eureka_server_responseCacheUpdateInvervalMs=*)
+                    Eureka_server_responseCacheUpdateInvervalMs=${OPTARG##*=}
+                    ;;
+                eureka_server_responseCacheAutoExpirationInSeconds=*)
+                    Eureka_server_responseCacheAutoExpirationInSeconds=${OPTARG##*=}
+                    ;;
+                eureka_server_eviction_interval_timer_in_ms=*)
+                    Eureka_server_eviction_interval_timer_in_ms=${OPTARG##*=}
+                    ;;
+                eureka_instance_lease_expiration_duration_in_seconds=*)
+                    Eureka_instance_lease_expiration_duration_in_seconds=${OPTARG##*=}
+                    ;;
+                eureka_instance_lease_renewal_interval_in_seconds=*)
+                    Eureka_instance_lease_renewal_interval_in_seconds=${OPTARG##*=}
+                    ;;
+                eureka_client_registryFetchIntervalSeconds=*)
+                    Eureka_client_registryFetchIntervalSeconds=${OPTARG##*=}
+                    ;;
+                ribbon_ServerListRefreshInterval=*)
+                    Ribbon_ServerListRefreshInterval=${OPTARG##*=}
+                    ;;
+                heap=*)
+                    HEAP=${OPTARG##*=}
+                    ;;
+                *)
+                    echo "Unknown option --${OPTARG}" >&2
+                    exit 1
+                    ;;
+            esac;;
+        h)
+            print_usage
+            exit
+            ;;
+        v)
+            echo "Parsing option: '-${optchar}'" >&2
+            ;;
+        *)
+            if [ "$OPTERR" != 1 ] || [ "${optspec:0:1}" = ":" ]; then
+                echo "Non-option argument: '-${OPTARG}'" >&2
+            fi
+            ;;
+    esac
+done
+
+
+if [[ $HOST =~ (.*)-([0-9]+)$ ]]; then
+    NAME=${BASH_REMATCH[1]}
+    ORD=${BASH_REMATCH[2]}
+else
+    echo "Fialed to parse name and ordinal of Pod"
+    exit 1
+fi
+
+
+APPNAME=`ls /opt/eureka/app/*.jar`
+
+create_config && create_jvm_props
+
+
+/usr/bin/java -javaagent:/opt/eureka/monitor/jmx_prometheus_javaagent.jar=9779:/opt/eureka/monitor/jmx_exporter_config.yml -jar $JVMFLAGS -Dspring.config.location=$CONF_FILE  $APPNAME
