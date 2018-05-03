@@ -24,38 +24,15 @@ is_in_jolokia_opts() {
 }
 
 dir=${MNT_DIR:-/opt/monitor}
-sep="="
+sep=" "
 
 # Options separators defined to avoid clash
-mnt_open_del="{""{"
-mnt_close_del="}""}"
-if [ -n "${escape_sep:-}" ]; then
-  mnt_open_del='\{\{'
-  mnt_close_del='\}\}'
-fi
-
 if [ -z "${MNT_OFF:-}" ]; then
-   # JOLOKIA,default port 8778
-   opts="-javaagent:$dir/jolokia-jvm-agent.jar"
-   config="${MNT_CONFIG:-$dir/jolokia.properties}"
-   if [ -f "$config" ]; then
-      # Configuration takes precedence
-      opts="${opts}${sep}config=${config}"
-      sep=':'
-   fi
-   # JMX_EXPORTER
-   opts="${opts} -javaagent:$dir/jmx_prometheus_javaagent.jar=9779"
-   config="${MNT_CONFIG:-$dir/jmx_exporter_config.yml}"
-   if [ -f "$config" ]; then
-      # Configuration takes precedence
-      opts="${opts}${sep}${config}"
-      sep=","
-   fi
-
+   # JOLOKIA
    if [ -z "${MNT_ENMNTLED:-}" ] || [ "${MNT_ENMNTLED}" != "${MNT_ENMNTLED/jolokia/}" ]; then
      # Direct options only if no configuration is found
-     jsep=""
-     jolokia_opts=""
+     jsep="="
+     jolokia_opts="-javaagent:$dir/jolokia-jvm-agent.jar"
      if [ -n "${MNT_JOLOKIA_CONFIG:-}" ] && [ -f "${MNT_JOLOKIA_CONFIG}" ]; then
         jolokia_opts="${jolokia_opts}${jsep}config=${MNT_JOLOKIA_CONFIG}"
         jsep=","
@@ -67,6 +44,10 @@ if [ -z "${MNT_OFF:-}" ]; then
      if [ -n "${MNT_JOLOKIA_HOST:-}" ]; then
         jolokia_opts="${jolokia_opts}${jsep}host=${MNT_JOLOKIA_HOST}"
         jsep=","
+     fi
+     #default port=8778
+     if [ -z "${MNT_JOLOKIA_PORT:-}" ] && [ -z "${host_in_config:-}" ]; then
+        MNT_JOLOKIA_PORT='8778'
      fi
      if [ -n "${MNT_JOLOKIA_PORT:-}" ]; then
         jolokia_opts="${jolokia_opts}${jsep}port=${MNT_JOLOKIA_PORT}"
@@ -111,23 +92,26 @@ if [ -z "${MNT_OFF:-}" ]; then
         jsep=","
      fi
 
-     opts="${opts}${sep}jolokia${mnt_open_del}${jolokia_opts}${mnt_close_del}"
-     sep=","
+     opts="${opts}${sep}${jolokia_opts}"
+     sep=" "
    fi
+
+   #JMX_EXPORTER
    if [ -z "${MNT_ENMNTLED:-}" ] || [ "${MNT_ENMNTLED}" != "${MNT_ENMNTLED/jmx_exporter/}" ]; then
-     je_opts=""
-     jsep=""
+     je_opts="-javaagent:$dir/jmx_prometheus_javaagent.jar"
+     jsep="="
      if [ -n "${MNT_JMX_EXPORTER_OPTS:-}" ]; then
-        opts="${opts}${sep}jmx_exporter${mnt_open_del}${MNT_JMX_EXPORTER_OPTS}${mnt_close_del}"
-        sep=","
+        opts="${opts}${sep}${je_opts}${jsep}${MNT_JMX_EXPORTER_OPTS}"
+        sep="="
      else
         port=${MNT_JMX_EXPORTER_PORT:-9779}
         config=${MNT_JMX_EXPORTER_CONFIG:-/opt/monitor/jmx_exporter_config.yml}
-        opts="${opts}${sep}jmx_exporter${mnt_open_del}${port}:${config}${mnt_close_del}"
-        sep=","
+        opts="${opts}${sep}${je_opts}${jsep}${port}:${config}"
+        sep="="
      fi
    fi
-   if [ "${sep:-}" != '=' ] ; then
+
+   if [ "${sep:-}" = '=' ] ; then
      echo ${opts}
    fi
 fi
