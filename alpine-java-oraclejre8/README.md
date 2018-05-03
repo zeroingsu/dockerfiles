@@ -53,7 +53,7 @@ Some options for integration in various environments:
 
 - **MNT_JMX_EXPORTER_OPTS** : Configuration to use for `jmx_exporter` (in the format `<port>:<path to config>`)
 - **MNT_JMX_EXPORTER_PORT** : Port to use for the JMX Exporter. Default: `9779`
-- **MNT_JMX_EXPORTER_CONFIG** : Path to configuration to use for `jmx_exporter`: Default: `/opt/agent-bond/jmx_exporter_config.json`
+- **MNT_JMX_EXPORTER_CONFIG** : Path to configuration to use for `jmx_exporter`: Default: `/opt/monitor/jmx_exporter_config.yml`
 
 ### Startup Script run-java.sh
 
